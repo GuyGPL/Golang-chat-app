@@ -20,4 +20,5 @@ Usage
 Start the server:
 `./Golang-chat-app`
 
-Open your web browser and go to http://localhost:8080.
+Open your web browser and go to http://localhost:8080. make sure server is up.
+Open html template in static folder. to start sending message
