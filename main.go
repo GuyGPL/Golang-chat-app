@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -8,7 +9,7 @@ import (
 )
 
 type Message struct {
-	Username *websocket.Conn
+	Username string
 	Message  string
 }
 
@@ -55,7 +56,7 @@ func handleConnections(ws *websocket.Conn) {
 			break
 		}
 
-		message := Message{Username: ws, Message: string(msg)}
+		message := Message{Username: ws.RemoteAddr().String(), Message: string(msg)}
 		// Print received message to the console
 		println("Received message:", message.Message)
 
@@ -67,9 +68,12 @@ func handleMessages() {
 	for {
 		msg := <-broadcast
 
+		// format message
+		messageToSend := fmt.Sprintf("[%s]: %s", msg.Username, msg.Message)
+
 		for client := range clients {
-			// Echo the received message back to the client
-			err := client.WriteMessage(websocket.TextMessage, []byte(msg.Message))
+			// Echo the received message back to all clients
+			err := client.WriteMessage(websocket.TextMessage, []byte(messageToSend))
 
 			if err != nil {
 				client.Close()
