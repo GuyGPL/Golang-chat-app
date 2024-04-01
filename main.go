@@ -7,7 +7,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
+type Message struct {
+	Username *websocket.Conn
+	Message  string
+}
+
+var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
+	return true
+}, ReadBufferSize: 1024, WriteBufferSize: 1024}
+
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan Message)
 
 func main() {
 	router := gin.Default()
@@ -24,29 +34,47 @@ func main() {
 			return
 		}
 
-		handleWebSocket(ws)
+		handleConnections(ws)
 	})
+
+	go handleMessages()
 
 	router.Run(":8080")
 }
 
-func handleWebSocket(ws *websocket.Conn) {
+func handleConnections(ws *websocket.Conn) {
 	defer ws.Close()
+
+	clients[ws] = true
 
 	// Read messages from the WebSocket connection
 	for {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
+			delete(clients, ws)
 			break
 		}
 
+		message := Message{Username: ws, Message: string(msg)}
 		// Print received message to the console
-		println("Received message:", string(msg))
+		println("Received message:", message.Message)
 
-		// Echo the received message back to the client
-		err = ws.WriteMessage(websocket.TextMessage, msg)
-		if err != nil {
-			break
+		broadcast <- message
+	}
+}
+
+func handleMessages() {
+	for {
+		msg := <-broadcast
+
+		for client := range clients {
+			// Echo the received message back to the client
+			err := client.WriteMessage(websocket.TextMessage, []byte(msg.Message))
+
+			if err != nil {
+				client.Close()
+				delete(clients, client)
+			}
 		}
 	}
 }
